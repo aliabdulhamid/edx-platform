@@ -2,7 +2,9 @@
 Test grade calculation.
 """
 
+import ddt
 from django.http import Http404
+import itertools
 from mock import patch
 from nose.plugins.attrib import attr
 from opaque_keys.edx.locations import SlashSeparatedCourseKey
@@ -11,15 +13,20 @@ from courseware.tests.helpers import (
     LoginEnrollmentTestCase,
     get_request_for_user
 )
+from lms.djangoapps.course_blocks.api import get_course_blocks
 from student.tests.factories import UserFactory
 from student.models import CourseEnrollment
+from xmodule.block_metadata_utils import display_name_with_default_escaped
+from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.graders import ProblemScore
 
 from .utils import answer_problem
 from .. import course_grades
 from ..course_grades import summary as grades_summary
 from ..new.course_grade import CourseGradeFactory
+from ..new.subsection_grade import SubsectionGradeFactory
 
 
 def _grade_with_errors(student, course):
@@ -34,6 +41,17 @@ def _grade_with_errors(student, course):
         raise Exception("I don't like {}".format(student.username))
 
     return grades_summary(student, course)
+
+
+def _create_problem_xml():
+    """
+    Creates and returns XML for a multiple choice response problem
+    """
+    return MultipleChoiceResponseXMLFactory().build_xml(
+        question_text='The correct answer is Choice 3',
+        choices=[False, False, True, False],
+        choice_names=['choice_0', 'choice_1', 'choice_2', 'choice_3']
+    )
 
 
 @attr(shard=1)
@@ -137,6 +155,101 @@ class TestGradeIteration(SharedModuleStoreTestCase):
         return students_to_gradesets, students_to_errors
 
 
+@ddt.ddt
+class TestWeightedProblems(SharedModuleStoreTestCase):
+    """
+    Test scores and grades with various problem weight values.
+    """
+    @classmethod
+    def setUpClass(cls):
+        super(TestWeightedProblems, cls).setUpClass()
+        cls.course = CourseFactory.create()
+        cls.chapter = ItemFactory.create(parent=cls.course, category="chapter", display_name="chapter")
+        cls.sequential = ItemFactory.create(parent=cls.chapter, category="sequential", display_name="sequential")
+        cls.vertical = ItemFactory.create(parent=cls.sequential, category="vertical", display_name="vertical1")
+        problem_xml = _create_problem_xml()
+        cls.problems = []
+        for i in range(2):
+            cls.problems.append(
+                ItemFactory.create(
+                    parent=cls.vertical,
+                    category="problem",
+                    display_name="problem_{}".format(i),
+                    data=problem_xml,
+                )
+            )
+
+    def setUp(self):
+        super(TestWeightedProblems, self).setUp()
+        self.user = UserFactory()
+        self.request = get_request_for_user(self.user)
+
+    def _verify_grades(self, r_earned, r_possible, weight, expected_score):
+        """
+        Verifies the computed grades are as expected.
+        """
+        with self.store.branch_setting(ModuleStoreEnum.Branch.draft_preferred):
+            # pylint: disable=no-member
+            for problem in self.problems:
+                problem.weight = weight
+                self.store.update_item(problem, self.user.id)
+            self.store.publish(self.course.location, self.user.id)
+
+        course_structure = get_course_blocks(self.request.user, self.course.location)
+
+        # answer all problems
+        for problem in self.problems:
+            answer_problem(self.course, self.request, problem, score=r_earned, max_value=r_possible)
+
+        # get grade
+        subsection_grade = SubsectionGradeFactory(
+            self.request.user, self.course, course_structure
+        ).update(self.sequential)
+
+        # verify all problem grades
+        for problem in self.problems:
+            problem_score = subsection_grade.locations_to_scores[problem.location]
+            expected_score.display_name = display_name_with_default_escaped(problem)
+            expected_score.module_id = problem.location
+            self.assertEquals(problem_score, expected_score)
+
+        # verify subsection grades
+        self.assertEquals(subsection_grade.all_total.earned, expected_score.earned * len(self.problems))
+        self.assertEquals(subsection_grade.all_total.possible, expected_score.possible * len(self.problems))
+
+    @ddt.data(
+        *itertools.product(
+            (0.0, 0.5, 1.0, 2.0),  # r_earned
+            (-2.0, -1.0, 0.0, 0.5, 1.0, 2.0),  # r_possible
+            (-2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 50.0, None),  # weight
+        )
+    )
+    @ddt.unpack
+    def test_problem_weight(self, r_earned, r_possible, weight):
+
+        use_weight = weight is not None and r_possible != 0
+        if use_weight:
+            expected_w_earned = r_earned / r_possible * weight
+            expected_w_possible = weight
+        else:
+            expected_w_earned = r_earned
+            expected_w_possible = r_possible
+
+        expected_graded = expected_w_possible > 0
+
+        expected_score = ProblemScore(
+            r_earned=r_earned,
+            r_possible=r_possible,
+            w_earned=expected_w_earned,
+            w_possible=expected_w_possible,
+            weight=weight,
+            graded=expected_graded,
+            display_name=None,  # problem-specific, filled in by _verify_grades
+            module_id=None,  # problem-specific, filled in by _verify_grades
+        )
+        self._verify_grades(r_earned, r_possible, weight, expected_score)
+
+
 class TestScoreForModule(SharedModuleStoreTestCase):
     """
     Test the method that calculates the score for a given block based on the
@@ -226,3 +339,4 @@ class TestScoreForModule(SharedModuleStoreTestCase):
         earned, possible = self.course_grade.score_for_module(self.m.location)
         self.assertEqual(earned, 0)
         self.assertEqual(possible, 0)
+
