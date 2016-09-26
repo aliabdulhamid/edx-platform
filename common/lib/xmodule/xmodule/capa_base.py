@@ -626,7 +626,6 @@ class CapaMixin(CapaFields):
         encapsulate (bool): if True (the default) embed the html in a problem <div>
         demand_hint_text (str): the demand hint text (optional, default is None)
         hint_index (int): the index of the last demand hint being shown (optional, default is 0)
-        save_notification_message (str): the save notification message to show (optional, default is None)
         submit_notification (bool): True if the submit notification should be added
         """
         try:
