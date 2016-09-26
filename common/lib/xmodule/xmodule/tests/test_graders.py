@@ -12,10 +12,8 @@ class GradesheetTest(unittest.TestCase):
 
     def test_weighted_grading(self):
         scores = []
-        ProblemScore.__sub__ = lambda me, other: (me.earned - other.earned) + (me.possible - other.possible)
-
         agg_fields = dict(display_name="aggregated_score", module_id=None)
-        prob_fields = dict(display_name="problem_score", module_id=None, r_earned=0, r_possible=0, weight=0)
+        prob_fields = dict(display_name="problem_score", module_id=None, raw_earned=0, raw_possible=0, weight=0)
 
         all_total, graded_total = aggregate_scores(scores, display_name=agg_fields['display_name'])
         self.assertEqual(
@@ -27,7 +25,7 @@ class GradesheetTest(unittest.TestCase):
             AggregatedScore(tw_earned=0, tw_possible=0, graded=True, **agg_fields),
         )
 
-        scores.append(ProblemScore(w_earned=0, w_possible=5, graded=False, **prob_fields))
+        scores.append(ProblemScore(weighted_earned=0, weighted_possible=5, graded=False, **prob_fields))
         all_total, graded_total = aggregate_scores(scores, display_name=agg_fields['display_name'])
         self.assertEqual(
             all_total,
@@ -38,7 +36,7 @@ class GradesheetTest(unittest.TestCase):
             AggregatedScore(tw_earned=0, tw_possible=0, graded=True, **agg_fields),
         )
 
-        scores.append(ProblemScore(w_earned=3, w_possible=5, graded=True, **prob_fields))
+        scores.append(ProblemScore(weighted_earned=3, weighted_possible=5, graded=True, **prob_fields))
         all_total, graded_total = aggregate_scores(scores, display_name=agg_fields['display_name'])
         self.assertAlmostEqual(
             all_total,
@@ -49,7 +47,7 @@ class GradesheetTest(unittest.TestCase):
             AggregatedScore(tw_earned=3, tw_possible=5, graded=True, **agg_fields),
         )
 
-        scores.append(ProblemScore(w_earned=2, w_possible=5, graded=True, **prob_fields))
+        scores.append(ProblemScore(weighted_earned=2, weighted_possible=5, graded=True, **prob_fields))
         all_total, graded_total = aggregate_scores(scores, display_name=agg_fields['display_name'])
         self.assertAlmostEqual(
             all_total,

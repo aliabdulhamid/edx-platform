@@ -9,10 +9,8 @@ from mock import patch
 from nose.plugins.attrib import attr
 from opaque_keys.edx.locations import SlashSeparatedCourseKey
 
-from courseware.tests.helpers import (
-    LoginEnrollmentTestCase,
-    get_request_for_user
-)
+from capa.tests.response_xml_factory import MultipleChoiceResponseXMLFactory
+from courseware.tests.helpers import LoginEnrollmentTestCase, get_request_for_user
 from lms.djangoapps.course_blocks.api import get_course_blocks
 from student.tests.factories import UserFactory
 from student.models import CourseEnrollment
@@ -184,7 +182,7 @@ class TestWeightedProblems(SharedModuleStoreTestCase):
         self.user = UserFactory()
         self.request = get_request_for_user(self.user)
 
-    def _verify_grades(self, r_earned, r_possible, weight, expected_score):
+    def _verify_grades(self, raw_earned, raw_possible, weight, expected_score):
         """
         Verifies the computed grades are as expected.
         """
@@ -199,7 +197,7 @@ class TestWeightedProblems(SharedModuleStoreTestCase):
 
         # answer all problems
         for problem in self.problems:
-            answer_problem(self.course, self.request, problem, score=r_earned, max_value=r_possible)
+            answer_problem(self.course, self.request, problem, score=raw_earned, max_value=raw_possible)
 
         # get grade
         subsection_grade = SubsectionGradeFactory(
@@ -219,35 +217,35 @@ class TestWeightedProblems(SharedModuleStoreTestCase):
 
     @ddt.data(
         *itertools.product(
-            (0.0, 0.5, 1.0, 2.0),  # r_earned
-            (-2.0, -1.0, 0.0, 0.5, 1.0, 2.0),  # r_possible
+            (0.0, 0.5, 1.0, 2.0),  # raw_earned
+            (-2.0, -1.0, 0.0, 0.5, 1.0, 2.0),  # raw_possible
             (-2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 50.0, None),  # weight
         )
     )
     @ddt.unpack
-    def test_problem_weight(self, r_earned, r_possible, weight):
+    def test_problem_weight(self, raw_earned, raw_possible, weight):
 
-        use_weight = weight is not None and r_possible != 0
+        use_weight = weight is not None and raw_possible != 0
         if use_weight:
-            expected_w_earned = r_earned / r_possible * weight
+            expected_w_earned = raw_earned / raw_possible * weight
             expected_w_possible = weight
         else:
-            expected_w_earned = r_earned
-            expected_w_possible = r_possible
+            expected_w_earned = raw_earned
+            expected_w_possible = raw_possible
 
         expected_graded = expected_w_possible > 0
 
         expected_score = ProblemScore(
-            r_earned=r_earned,
-            r_possible=r_possible,
-            w_earned=expected_w_earned,
-            w_possible=expected_w_possible,
+            raw_earned=raw_earned,
+            raw_possible=raw_possible,
+            weighted_earned=expected_w_earned,
+            weighted_possible=expected_w_possible,
             weight=weight,
             graded=expected_graded,
             display_name=None,  # problem-specific, filled in by _verify_grades
             module_id=None,  # problem-specific, filled in by _verify_grades
         )
-        self._verify_grades(r_earned, r_possible, weight, expected_score)
+        self._verify_grades(raw_earned, raw_possible, weight, expected_score)
 
 
 class TestScoreForModule(SharedModuleStoreTestCase):
@@ -339,4 +337,3 @@ class TestScoreForModule(SharedModuleStoreTestCase):
         earned, possible = self.course_grade.score_for_module(self.m.location)
         self.assertEqual(earned, 0)
         self.assertEqual(possible, 0)
-

@@ -43,13 +43,13 @@ def get_score(submissions_scores, csm_scores, persisted_block, block):
         is used by ORA.
 
         The returned score includes valid values for:
-            w_earned
-            w_possible
+            weighted_earned
+            weighted_possible
             graded - retrieved from the persisted block, if found, else from
                 the latest block content.
 
-        Note: r_earned and r_possible are not required when submitting scores
-        via the submissions API.  And so those along with weight (since unused)
+        Note: raw_earned and raw_possible are not required when submitting scores
+        via the submissions API, so those values (along with the unused weight)
         are invalid and irrelevant.
 
     csm_scores (ScoresClient):
@@ -64,8 +64,8 @@ def get_score(submissions_scores, csm_scores, persisted_block, block):
         by external graders.
 
         The returned score includes valid values for:
-            r_earned, r_possible - retrieved from CSM
-            w_earned, w_possible - calculated from the raw scores and weight
+            raw_earned, raw_possible - retrieved from CSM
+            weighted_earned, weighted_possible - calculated from the raw scores and weight
             weight, graded - retrieved from the persisted block, if found,
                 else from the latest block content
 
@@ -78,10 +78,10 @@ def get_score(submissions_scores, csm_scores, persisted_block, block):
         yet attempted this problem, but the user's grade _was_ persisted.
 
         The returned score includes valid values for:
-            r_earned - will equal 0.0 since the user's score was not found from
+            raw_earned - will equal 0.0 since the user's score was not found from
                 earlier storages
-            r_possible - retrieved from the persisted block
-            w_earned, w_possible - calculated from the raw scores and weight
+            raw_possible - retrieved from the persisted block
+            weighted_earned, weighted_possible - calculated from the raw scores and weight
             weight, graded - retrieved from the persisted block
 
     block (block_structure.BlockData):
@@ -92,31 +92,31 @@ def get_score(submissions_scores, csm_scores, persisted_block, block):
         yet attempted this problem and the user's grade was _not_ yet persisted.
 
         The returned score includes valid values for:
-            r_earned - will equal 0.0 since the user's score was not found from
+            raw_earned - will equal 0.0 since the user's score was not found from
                 earlier storages
-            r_possible - retrieved from the latest block content
-            w_earned, w_possible - calculated from the raw scores and weight
+            raw_possible - retrieved from the latest block content
+            weighted_earned, weighted_possible - calculated from the raw scores and weight
             weight, graded - retrieved from the latest block content
     """
     weight = _get_weight_from_block(persisted_block, block)
 
     # Priority order for retrieving the scores:
     # submissions API -> CSM -> grades persisted block -> latest block content
-    r_earned, r_possible, w_earned, w_possible = (
+    raw_earned, raw_possible, weighted_earned, weighted_possible = (
         _get_score_from_submissions(submissions_scores, block) or
         _get_score_from_csm(csm_scores, block, weight) or
-        _get_score_from_block(persisted_block, block, weight)
+        _get_score_from_persisted_or_latest_block(persisted_block, block, weight)
     )
 
-    assert w_possible is not None
-    has_valid_denominator = w_possible > 0.0
+    assert weighted_possible is not None
+    has_valid_denominator = weighted_possible > 0.0
     graded = _get_graded_from_block(persisted_block, block) if has_valid_denominator else False
 
     return ProblemScore(
-        r_earned,
-        r_possible,
-        w_earned,
-        w_possible,
+        raw_earned,
+        raw_possible,
+        weighted_earned,
+        weighted_possible,
         weight,
         graded,
         display_name=display_name_with_default_escaped(block),
@@ -131,9 +131,9 @@ def _get_score_from_submissions(submissions_scores, block):
     if submissions_scores:
         submission_value = submissions_scores.get(unicode(block.location))
         if submission_value:
-            w_earned, w_possible = submission_value
-            assert w_earned >= 0.0 and w_possible > 0.0  # per contract from submissions API
-            return (None, None) + (w_earned, w_possible)
+            weighted_earned, weighted_possible = submission_value
+            assert weighted_earned >= 0.0 and weighted_possible > 0.0  # per contract from submissions API
+            return (None, None) + (weighted_earned, weighted_possible)
 
 
 def _get_score_from_csm(csm_scores, block, weight):
@@ -141,40 +141,40 @@ def _get_score_from_csm(csm_scores, block, weight):
     Returns the score values from the courseware student module, via
     ScoresClient, if found.
     """
-    # If an entry exists and has r_possible (total) associated with it, we trust
+    # If an entry exists and has raw_possible (total) associated with it, we trust
     # that value. This is important for cases where a student might have seen an
     # older version of the problem -- they're still graded on what was possible
     # when they tried the problem, not what it's worth now.
     #
-    # Note: Storing r_possible in CSM predates the implementation of the grades
+    # Note: Storing raw_possible in CSM predates the implementation of the grades
     # own persistence layer. Hence, we have duplicate storage locations for
-    # r_possible, with potentially conflicting values, when a problem is
+    # raw_possible, with potentially conflicting values, when a problem is
     # attempted. Even though the CSM persistence for this value is now
     # superfluous, for backward compatibility, we continue to use its value for
-    # r_possible, giving it precedence over the one in the grades data model.
+    # raw_possible, giving it precedence over the one in the grades data model.
     score = csm_scores.get(block.location)
     has_valid_score = score and score.total is not None
     if has_valid_score:
-        r_earned = score.correct if score.correct is not None else 0.0
-        r_possible = score.total
-        return (r_earned, r_possible) + _weighted_score(r_earned, r_possible, weight)
+        raw_earned = score.correct if score.correct is not None else 0.0
+        raw_possible = score.total
+        return (raw_earned, raw_possible) + _weighted_score(raw_earned, raw_possible, weight)
 
 
-def _get_score_from_block(persisted_block, block, weight):
+def _get_score_from_persisted_or_latest_block(persisted_block, block, weight):
     """
     Returns the score values, now assuming the earned score is 0.0 - since a
     score was not found in an earlier storage.
-    Uses the r_possible value from the persisted_block if found, else from
+    Uses the raw_possible value from the persisted_block if found, else from
     the latest block content.
     """
-    r_earned = 0.0
+    raw_earned = 0.0
 
     if persisted_block:
-        r_possible = persisted_block.r_possible
+        raw_possible = persisted_block.raw_possible
     else:
-        r_possible = block.transformer_data[GradesTransformer].max_score
+        raw_possible = block.transformer_data[GradesTransformer].max_score
 
-    return (r_earned, r_possible) + _weighted_score(r_earned, r_possible, weight)
+    return (raw_earned, raw_possible) + _weighted_score(raw_earned, raw_possible, weight)
 
 
 def _get_weight_from_block(persisted_block, block):
@@ -216,17 +216,17 @@ def _get_explicit_graded(block):
     return True if field_value is None else field_value
 
 
-def _weighted_score(r_earned, r_possible, weight):
+def _weighted_score(raw_earned, raw_possible, weight):
     """
     Returns a tuple that represents the weighted (earned, possible) score.
-    If weight is None or r_possible is 0, returns the original values.
+    If weight is None or raw_possible is 0, returns the original values.
     """
-    assert r_possible is not None
-    cannot_compute_with_weight = weight is None or r_possible == 0
+    assert raw_possible is not None
+    cannot_compute_with_weight = weight is None or raw_possible == 0
     if cannot_compute_with_weight:
-        return r_earned, r_possible
+        return raw_earned, raw_possible
     else:
-        return float(r_earned) * weight / r_possible, float(weight)
+        return float(raw_earned) * weight / raw_possible, float(weight)
 
 
 @memoized
@@ -240,7 +240,7 @@ def _block_types_possibly_scored():
     which have state but cannot ever impact someone's grade.
     """
     return frozenset(
-        cat for (cat, xblock_class) in XBlock.load_classes() if (
+        category for (category, xblock_class) in XBlock.load_classes() if (
             getattr(xblock_class, 'has_score', False) or getattr(xblock_class, 'has_children', False)
         )
     )

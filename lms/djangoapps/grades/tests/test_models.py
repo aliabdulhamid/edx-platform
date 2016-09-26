@@ -71,8 +71,8 @@ class GradesModelTestCase(TestCase):
             block_type='problem',
             block_id='block_id_b'
         )
-        self.record_a = BlockRecord(locator=self.locator_a, weight=1, r_possible=10, graded=False)
-        self.record_b = BlockRecord(locator=self.locator_b, weight=1, r_possible=10, graded=True)
+        self.record_a = BlockRecord(locator=self.locator_a, weight=1, raw_possible=10, graded=False)
+        self.record_b = BlockRecord(locator=self.locator_b, weight=1, raw_possible=10, graded=True)
 
 
 @ddt.ddt
@@ -88,11 +88,11 @@ class BlockRecordTest(GradesModelTestCase):
         Tests creation of a BlockRecord.
         """
         weight = 1
-        r_possible = 10
+        raw_possible = 10
         record = BlockRecord(
             self.locator_a,
             weight,
-            r_possible,
+            raw_possible,
             graded=False,
         )
         self.assertEqual(record.locator, self.locator_a)
@@ -103,15 +103,15 @@ class BlockRecordTest(GradesModelTestCase):
         ("BlockRecord is", "a dumb data store", "with no validation", None),
     )
     @ddt.unpack
-    def test_serialization(self, weight, r_possible, block_key, graded):
+    def test_serialization(self, weight, raw_possible, block_key, graded):
         """
         Tests serialization of a BlockRecord using the _asdict() method.
         """
-        record = BlockRecord(block_key, weight, r_possible, graded)
+        record = BlockRecord(block_key, weight, raw_possible, graded)
         expected = OrderedDict([
             ("locator", block_key),
             ("weight", weight),
-            ("r_possible", r_possible),
+            ("raw_possible", raw_possible),
             ("graded", graded),
         ])
         self.assertEqual(expected, record._asdict())
@@ -138,7 +138,7 @@ class VisibleBlocksTest(GradesModelTestCase):
         expected_data = {
             'blocks': [{
                 'locator': unicode(self.record_a.locator),
-                'r_possible': 10,
+                'raw_possible': 10,
                 'weight': 1,
                 'graded': self.record_a.graded,
             }],

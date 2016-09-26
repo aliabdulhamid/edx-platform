@@ -169,7 +169,7 @@ class SubsectionGrade(object):
         Returns the list of visible blocks.
         """
         return [
-            BlockRecord(location, score.weight, score.r_possible, score.graded)
+            BlockRecord(location, score.weight, score.raw_possible, score.graded)
             for location, score in
             self.locations_to_scores.iteritems()
         ]

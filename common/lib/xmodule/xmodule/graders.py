@@ -45,18 +45,18 @@ class ProblemScore(ScoreBase):
     """
     Encapsulates the fields of a Problem's score.
     In addition to the fields in ScoreBase, also includes:
-        r_earned (float) - "raw" points "earned" on this problem
-        r_possible (float) - "raw" points "possible" to earn on this problem
-        w_earned = earned (float) - "weighted" value of the points "earned"
-        w_possible = possible (float) - "weighted" "possible" points on this problem
+        raw_earned (float) - raw points earned on this problem
+        raw_possible (float) - raw points possible to earn on this problem
+        weighted_earned = earned (float) - weighted value of the points earned
+        weighted_possible = possible (float) - weighted possible points on this problem
         weight (float) - weight of this problem
     """
-    def __init__(self, r_earned, r_possible, w_earned, w_possible, weight, *args, **kwargs):
+    def __init__(self, raw_earned, raw_possible, weighted_earned, weighted_possible, weight, *args, **kwargs):
         super(ProblemScore, self).__init__(*args, **kwargs)
-        self.r_earned = r_earned
-        self.r_possible = r_possible
-        self.earned = w_earned
-        self.possible = w_possible
+        self.raw_earned = raw_earned
+        self.raw_possible = raw_possible
+        self.earned = weighted_earned
+        self.possible = weighted_possible
         self.weight = weight
 
 
@@ -65,7 +65,7 @@ class AggregatedScore(ScoreBase):
     Encapsulates the fields of a Subsection's score.
     In addition to the fields in ScoreBase, also includes:
         tw_earned = earned - total aggregated sum of all weighted earned values
-        tw_possible = possible - total aggregated sum of all possible values
+        tw_possible = possible - total aggregated sum of all weighted possible values
     """
     def __init__(self, tw_earned, tw_possible, *args, **kwargs):
         super(AggregatedScore, self).__init__(*args, **kwargs)
@@ -82,11 +82,12 @@ def float_sum(iterable):
 
 def aggregate_scores(scores, display_name="summary", location=None):
     """
-    scores: A list of Score objects
+    scores: A list of ScoreBase objects
+    display_name: The display name for the score object
     location: The location under which all objects in scores are located
     returns: A tuple (all_total, graded_total).
-        all_total: A Score representing the total score summed over all input scores
-        graded_total: A Score representing the score summed over all graded input scores
+        all_total: A ScoreBase representing the total score summed over all input scores
+        graded_total: A ScoreBase representing the score summed over all graded input scores
     """
     total_correct_graded = float_sum(score.earned for score in scores if score.graded)
     total_possible_graded = float_sum(score.possible for score in scores if score.graded)
