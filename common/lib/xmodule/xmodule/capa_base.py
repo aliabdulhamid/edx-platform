@@ -616,7 +616,6 @@ class CapaMixin(CapaFields):
     def get_problem_html(self, encapsulate=True,
                          demand_hint_text=None,
                          hint_index=0,
-                         save_notification_message=None,
                          submit_notification=False):
         """
         Return html for the problem.
@@ -676,7 +675,6 @@ class CapaMixin(CapaFields):
             'demand_hint_possible': demand_hint_possible,
             'should_enable_next_hint': should_enable_next_hint,
             'hint_notification_message': demand_hint_text,
-            'save_notification_message': save_notification_message,
             'answer_notification_type': answer_notification_type,
             'answer_notification_message': answer_notification_message,
         }
@@ -1487,7 +1485,7 @@ class CapaMixin(CapaFields):
         return {
             'success': True,
             'msg': msg,
-            'html': self.get_problem_html(encapsulate=False, save_notification_message=msg),
+            'html': self.get_problem_html(encapsulate=False),
         }
 
     def reset_problem(self, _data):
