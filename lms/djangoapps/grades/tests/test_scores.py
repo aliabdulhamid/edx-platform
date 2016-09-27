@@ -51,7 +51,9 @@ class TestGetScore(TestCase):
     CSMValue = namedtuple('CSMValue', 'exists, raw_earned, raw_possible')
     PersistedBlockValue = namedtuple('PersistedBlockValue', 'exists, raw_possible, weight, graded')
     ContentBlockValue = namedtuple('ContentBlockValue', 'raw_possible, weight, explicit_graded')
-    ExpectedResult = namedtuple('ExpectedResult', 'raw_earned, raw_possible, weighted_earned, weighted_possible, weight, graded')
+    ExpectedResult = namedtuple(
+        'ExpectedResult', 'raw_earned, raw_possible, weighted_earned, weighted_possible, weight, graded'
+    )
 
     def _create_submissions_scores(self, submission_value):
         """
@@ -110,7 +112,9 @@ class TestGetScore(TestCase):
             CSMValue(exists=True, raw_earned=10, raw_possible=40),
             PersistedBlockValue(exists=True, raw_possible=5, weight=40, graded=True),
             ContentBlockValue(raw_possible=1, weight=20, explicit_graded=False),
-            ExpectedResult(raw_earned=None, raw_possible=None, weighted_earned=50, weighted_possible=100, weight=40, graded=True),
+            ExpectedResult(
+                raw_earned=None, raw_possible=None, weighted_earned=50, weighted_possible=100, weight=40, graded=True
+            ),
         ),
         # same as above, except submissions doesn't exist; CSM values used
         (
@@ -118,7 +122,9 @@ class TestGetScore(TestCase):
             CSMValue(exists=True, raw_earned=10, raw_possible=40),
             PersistedBlockValue(exists=True, raw_possible=5, weight=40, graded=True),
             ContentBlockValue(raw_possible=1, weight=20, explicit_graded=False),
-            ExpectedResult(raw_earned=10, raw_possible=40, weighted_earned=10, weighted_possible=40, weight=40, graded=True),
+            ExpectedResult(
+                raw_earned=10, raw_possible=40, weighted_earned=10, weighted_possible=40, weight=40, graded=True
+            ),
         ),
         # neither submissions nor CSM exist; Persisted values used
         (
@@ -126,7 +132,9 @@ class TestGetScore(TestCase):
             CSMValue(exists=False, raw_earned=10, raw_possible=40),
             PersistedBlockValue(exists=True, raw_possible=5, weight=40, graded=True),
             ContentBlockValue(raw_possible=1, weight=20, explicit_graded=False),
-            ExpectedResult(raw_earned=0, raw_possible=5, weighted_earned=0, weighted_possible=40, weight=40, graded=True),
+            ExpectedResult(
+                raw_earned=0, raw_possible=5, weighted_earned=0, weighted_possible=40, weight=40, graded=True
+            ),
         ),
         # none of submissions, CSM, or persisted exist; Latest content values used
         (
@@ -134,7 +142,9 @@ class TestGetScore(TestCase):
             CSMValue(exists=False, raw_earned=10, raw_possible=40),
             PersistedBlockValue(exists=False, raw_possible=5, weight=40, graded=True),
             ContentBlockValue(raw_possible=1, weight=20, explicit_graded=False),
-            ExpectedResult(raw_earned=0, raw_possible=1, weighted_earned=0, weighted_possible=20, weight=20, graded=False),
+            ExpectedResult(
+                raw_earned=0, raw_possible=1, weighted_earned=0, weighted_possible=20, weight=20, graded=False
+            ),
         ),
     )
     @ddt.unpack
